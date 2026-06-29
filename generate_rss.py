@@ -25,7 +25,6 @@ def fetch_category_articles(sources, max_per_source=15):
     for url in sources:
         try:
             print(f"Stahujem feed: {url}")
-            # Rychle stiahnutie pomocou requests pre zamedzenie blokovania
             resp = requests.get(url, headers=headers, timeout=15)
             feed = feedparser.parse(resp.content)
             
@@ -39,7 +38,6 @@ def fetch_category_articles(sources, max_per_source=15):
                     continue
                     
                 seen_urls.add(link)
-                # Skracenie obsahu pre prompt a odstranenie HTML tagov
                 clean_summary = re.sub('<[^<]+?>', '', summary).replace("\n", " ").strip()[:300]
                 articles.append({
                     "title": title,
@@ -55,20 +53,15 @@ def fetch_category_articles(sources, max_per_source=15):
     return articles
 
 def parse_json_from_response(content):
-    """Robustne vytiahnutie JSON pola alebo objektu z textu odpovede."""
     content = content.strip()
-    
-    # Odstranenie markdown obalov
     if "```" in content:
         match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', content)
         if match:
             content = match.group(1).strip()
 
-    # Pokus o priame nacitanie
     try:
         data = json.loads(content)
     except json.JSONDecodeError:
-        # Vyhladanie prveho [ a posledneho ]
         start_arr = content.find("[")
         end_arr = content.rfind("]")
         if start_arr != -1 and end_arr != -1 and end_arr > start_arr:
@@ -79,7 +72,6 @@ def parse_json_from_response(content):
         else:
             data = []
             
-    # Ak LLM vratil objekt namiesto pola (napr. {"items": [...]})
     if isinstance(data, dict):
         for key in ["items", "articles", "news", "data", "results"]:
             if key in data and isinstance(data[key], list):
@@ -116,7 +108,7 @@ def summarize_with_llm(client, category_title, articles, config):
     )
     
     user_content = f"Kategoria: {category_title}\nZoznam stiahnutych clankov ({len(articles)}):\n"
-    for idx, a in enumerate(articles[:40], 1): # obmedzenie na max 40 pre rozsah promptu
+    for idx, a in enumerate(articles[:40], 1):
         user_content += f"{idx}. Titul: {a['title']}\n   Link: {a['link']}\n   Snippet: {a['summary_raw']}\n\n"
 
     def make_api_call(selected_model):
@@ -152,10 +144,30 @@ def summarize_with_llm(client, category_title, articles, config):
         return []
 
 def generate_rss_xml(category, items, output_path):
+    now_dt = datetime.datetime.now(datetime.timezone.utc)
+    now_str = now_dt.strftime("%a, %d %b %Y %H:%M:%S GMT")
+    today_display = now_dt.strftime("%d.%m.%Y")
+    today_iso = now_dt.strftime("%Y-%m-%d")
+    
+    # Nocitanie stavajuceho RSS ak existuje, aby sme zachovali predchadzajuce dni
+    existing_items = []
+    if os.path.exists(output_path):
+        try:
+            tree = ET.parse(output_path)
+            root = tree.getroot()
+            channel_elem = root.find("channel")
+            if channel_elem is not None:
+                for item_elem in channel_elem.findall("item"):
+                    # Zachovame len spravy z inych dni ako dnes (aby sme dnesnu popripade prepisali novou)
+                    guid_elem = item_elem.find("guid")
+                    guid_val = guid_elem.text if guid_elem is not None else ""
+                    if not guid_val.endswith(f"-{today_iso}"):
+                        existing_items.append(item_elem)
+        except Exception as e:
+            print(f"Poznamka: Nepodarilo sa nacitat stavajuce RSS, vytvaram nove ({e})")
+
     rss = ET.Element("rss", version="2.0")
     channel = ET.SubElement(rss, "channel")
-    
-    now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%a, %d %b %Y %H:%M:%S GMT")
     
     ET.SubElement(channel, "title").text = category["title"]
     ET.SubElement(channel, "description").text = category["description"]
@@ -163,20 +175,39 @@ def generate_rss_xml(category, items, output_path):
     ET.SubElement(channel, "language").text = "sk"
     ET.SubElement(channel, "pubDate").text = now_str
     
-    valid_items_count = 0
-    if isinstance(items, list):
-        for item in items:
+    # Vytvorenie JEDNEJ dennej polozky so 10 novinkami vo formate HTML
+    if isinstance(items, list) and len(items) > 0:
+        daily_entry = ET.SubElement(channel, "item")
+        ET.SubElement(daily_entry, "title").text = f"{category['title']} – {today_display}"
+        ET.SubElement(daily_entry, "link").text = f"https://pato7.github.io/rss-news-aggregator/{category['id']}.xml#{today_iso}"
+        ET.SubElement(daily_entry, "guid").text = f"digest-{category['id']}-{today_iso}"
+        ET.SubElement(daily_entry, "pubDate").text = now_str
+        
+        # Priprava HTML obsahu so sumarmi a odkazmi
+        html_parts = [f"<h2>Denný prehľad – {today_display}</h2>", "<ol style='line-height: 1.6;'>"]
+        for idx, item in enumerate(items, 1):
             if not isinstance(item, dict):
                 continue
-            entry = ET.SubElement(channel, "item")
-            ET.SubElement(entry, "title").text = str(item.get("title", "Bez nazvu"))
-            ET.SubElement(entry, "link").text = str(item.get("link", ""))
-            ET.SubElement(entry, "description").text = str(item.get("summary", ""))
-            ET.SubElement(entry, "guid").text = str(item.get("link", ""))
-            ET.SubElement(entry, "pubDate").text = now_str
-            valid_items_count += 1
+            title = str(item.get("title", "Bez nazvu"))
+            link = str(item.get("link", "#"))
+            summary = str(item.get("summary", ""))
             
-    print(f"Zapisujem {valid_items_count} poloziek do RSS feedu.")
+            html_parts.append(
+                f"<li style='margin-bottom: 18px;'>"
+                f"<strong><a href='{link}' target='_blank' style='font-size: 16px; color: #1a0dab;'>{title}</a></strong><br/>"
+                f"<span style='color: #333;'>{summary}</span>"
+                f"</li>"
+            )
+        html_parts.append("</ol>")
+        
+        full_html_content = "".join(html_parts)
+        ET.SubElement(daily_entry, "description").text = full_html_content
+        print(f"Vytvorena 1 denna sumarizacna polozka so {len(items)} spravami.")
+
+    # Pridanie predchadzajucich dni (max 30 dni historicky)
+    for prev_item in existing_items[:30]:
+        channel.append(prev_item)
+        
     xml_str = ET.tostring(rss, encoding="utf-8")
     parsed = minidom.parseString(xml_str)
     pretty_xml = parsed.toprettyxml(indent="  ", encoding="utf-8")
@@ -189,7 +220,7 @@ def generate_rss_xml(category, items, output_path):
 def main():
     api_key = os.environ.get("OPENROUTER_API_KEY")
     if not api_key:
-        print("KTRITICKA CHYBA: Chyba OPENROUTER_API_KEY v premennych prostredia!")
+        print("KRITICKA CHYBA: Chyba OPENROUTER_API_KEY v premennych prostredia!")
         sys.exit(1)
         
     client = OpenAI(
