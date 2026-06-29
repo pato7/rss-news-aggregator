@@ -91,7 +91,6 @@ def summarize_with_llm(client, category, articles, config):
     fallback_model = config.get("fallback_model", "meta-llama/llama-3.3-70b-instruct")
     max_items = config.get("max_items_per_category", 10)
     
-    # Prispobenie podla kategorie
     category_instructions = ""
     if category_id == "it":
         category_instructions = (
@@ -186,9 +185,9 @@ def generate_unified_rss(categories_data, output_path):
     rss = ET.Element("rss", version="2.0")
     channel = ET.SubElement(rss, "channel")
     
-    # Zmena nazvu kanala na "Denné novinky"
     ET.SubElement(channel, "title").text = "Denné novinky"
-    ET.SubElement(channel, "description").text = "Jednotný denný sumarizovaný prehľad najvýznamnejších správ z oboru IT a AI."
+    # Presny popis podla zadaní
+    ET.SubElement(channel, "description").text = "Jednotný denný sumarizovaný prehľad najvýznamnejších správ z rôznych oborov."
     ET.SubElement(channel, "link").text = "https://pato7.github.io/rss-news-aggregator/daily-news.xml"
     ET.SubElement(channel, "language").text = "sk"
     ET.SubElement(channel, "pubDate").text = now_str
