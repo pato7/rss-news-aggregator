@@ -1,4 +1,4 @@
-# Konfigurácia pre RSS Aggregator
+# Konfigurácia pre AI & IT RSS Aggregator
 
 language: "sk" # Slovenčina pre sumáre
 max_items_per_category: 10
@@ -10,7 +10,7 @@ fallback_model: "meta-llama/llama-3.3-70b-instruct"
 # Kategórie a ich zdroje
 categories:
   - id: "ai"
-    title: "TOP 10 AI novinky"
+    title: "AI novinky"
     description: "Denný AI sumarizovaný prehľad najvýznamnejších správ z oboru umelá inteligencia."
     sources:
       - "https://hnrss.org/frontpage?points=100"
@@ -20,13 +20,10 @@ categories:
       - "https://venturebeat.com/category/ai/feed/"
 
   - id: "it"
-    title: "TOP 10 IT & tech novinky"
+    title: "IT novinky"
     description: "Denný IT sumarizovaný prehľad najvýznamnejších správ z oblasti technológií, vývoja a bezpečnosti."
     sources:
-      - "https://hnrss.org/frontpage?points=150"
+      - "https://hnrss.org/frontpage?points=100"
       - "https://techcrunch.com/feed/"
       - "https://feeds.arstechnica.com/arstechnica/index"
       - "https://www.theverge.com/rss/index.xml"
-      - "https://www.zive.sk/rss/najnovsie"
-      - "https://www.engadget.com/rss.xml"
-      - "https://touchit.sk/feed"

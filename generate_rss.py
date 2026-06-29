@@ -81,17 +81,32 @@ def parse_json_from_response(content):
         return data
     return []
 
-def summarize_with_llm(client, category_title, articles, config):
+def summarize_with_llm(client, category, articles, config):
     if not articles:
         return []
         
+    category_id = category["id"]
+    category_title = category["title"]
     model = config.get("openrouter_model", "google/gemini-2.5-flash")
     fallback_model = config.get("fallback_model", "meta-llama/llama-3.3-70b-instruct")
     max_items = config.get("max_items_per_category", 10)
     
+    # Prispobenie podla kategorie
+    category_instructions = ""
+    if category_id == "it":
+        category_instructions = (
+            "DÔLEŽITÉ: Týka sa to výhradne IT noviniek. PRÍSNE VYFILTRUJ a vynechaj všetky správy týkajúce sa umelej inteligencie (AI, LLM, ChatGPT, Machine Learning aj GPU pre AI), "
+            "keďže AI má vlastnú samostatnú kategóriu! Zameraj sa výhradne na klasické IT, softvérové inžinierstvo, kyberbezpečnosť, operačné systémy, cloud, hardware a tech biznis.\n"
+        )
+    elif category_id == "ai":
+        category_instructions = (
+            "DÔLEŽITÉ: Zameraj sa výhradne na novinky z oboru Umelá inteligencia (AI, LLM, Machine Learning, výskumné modely, AI nástroje a AI výpočtovú infraštruktúru).\n"
+        )
+    
     system_prompt = (
         "Si spickovy IT a AI sefredaktor. Tvojou ulohou je vybrat a zhrnut najdolezitejsie spravy z oboru.\n"
-        f"Dostanes zoznam dnesnych clankov. Vyber z nich presne TOP {max_items} najvyznamnejsich a najzasadnejsich sprav.\n"
+        f"Dostanes zoznam dnesnych clankov pre kategóriu '{category_title}'. Vyber z nich presne TOP {max_items} najvyznamnejsich a najzasadnejsich sprav.\n"
+        f"{category_instructions}"
         "Pravidla:\n"
         "1. Ak viacero clankov pise o tej istej teme/udalosti, spoj ich do jednej spravy (deduplikuj).\n"
         "2. Vyber len spravy s realnym dopadom, ignoruj balast a sponzorovany obsah.\n"
@@ -112,7 +127,7 @@ def summarize_with_llm(client, category_title, articles, config):
         user_content += f"{idx}. Titul: {a['title']}\n   Link: {a['link']}\n   Snippet: {a['summary_raw']}\n\n"
 
     def make_api_call(selected_model):
-        print(f"Volam OpenRouter API s modelom: {selected_model}...")
+        print(f"Volam OpenRouter API s modelom: {selected_model} pre kategóriu {category_id}...")
         response = client.chat.completions.create(
             model=selected_model,
             messages=[
@@ -149,7 +164,6 @@ def generate_unified_rss(categories_data, output_path):
     today_display = now_dt.strftime("%d. %m. %Y")
     today_iso = now_dt.strftime("%Y-%m-%d")
     
-    # Nocitanie stavajucich poloziek ak subor existuje
     existing_items = []
     today_guids = set()
     for cat in categories_data:
@@ -172,13 +186,13 @@ def generate_unified_rss(categories_data, output_path):
     rss = ET.Element("rss", version="2.0")
     channel = ET.SubElement(rss, "channel")
     
-    ET.SubElement(channel, "title").text = "Denné IT & AI Novinky"
+    # Zmena nazvu kanala na "Denné novinky"
+    ET.SubElement(channel, "title").text = "Denné novinky"
     ET.SubElement(channel, "description").text = "Jednotný denný sumarizovaný prehľad najvýznamnejších správ z oboru IT a AI."
     ET.SubElement(channel, "link").text = "https://pato7.github.io/rss-news-aggregator/daily-news.xml"
     ET.SubElement(channel, "language").text = "sk"
     ET.SubElement(channel, "pubDate").text = now_str
     
-    # Vytvorenie poloziek pre kazdu kategoriu za dnesok
     new_items_count = 0
     for cat in categories_data:
         items = cat["curated_items"]
@@ -210,7 +224,6 @@ def generate_unified_rss(categories_data, output_path):
             ET.SubElement(daily_entry, "description").text = "".join(html_parts)
             new_items_count += 1
 
-    # Pridanie predchadzajucich dni (max 60 poloziek v historii)
     for prev_item in existing_items[:60]:
         channel.append(prev_item)
         
@@ -244,12 +257,11 @@ def main():
         articles = fetch_category_articles(cat["sources"])
         print(f"Celkovo najdenych clankov: {len(articles)}")
         
-        curated_items = summarize_with_llm(client, cat["title"], articles, config)
+        curated_items = summarize_with_llm(client, cat, articles, config)
         cat_copy = dict(cat)
         cat_copy["curated_items"] = curated_items
         categories_data.append(cat_copy)
 
-    # Vygenerujeme jeden hlavny feed daily-news.xml
     master_out_file = os.path.join(public_dir, "daily-news.xml")
     generate_unified_rss(categories_data, master_out_file)
 
