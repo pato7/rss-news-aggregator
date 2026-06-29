@@ -143,14 +143,18 @@ def summarize_with_llm(client, category_title, articles, config):
         print(f"Kriticka chyba pri LLM spracovani: {e2}")
         return []
 
-def generate_rss_xml(category, items, output_path):
+def generate_unified_rss(categories_data, output_path):
     now_dt = datetime.datetime.now(datetime.timezone.utc)
     now_str = now_dt.strftime("%a, %d %b %Y %H:%M:%S GMT")
-    today_display = now_dt.strftime("%d.%m.%Y")
+    today_display = now_dt.strftime("%d. %m. %Y")
     today_iso = now_dt.strftime("%Y-%m-%d")
     
-    # Nocitanie stavajuceho RSS ak existuje, aby sme zachovali predchadzajuce dni
+    # Nocitanie stavajucich poloziek ak subor existuje
     existing_items = []
+    today_guids = set()
+    for cat in categories_data:
+        today_guids.add(f"digest-{cat['id']}-{today_iso}")
+
     if os.path.exists(output_path):
         try:
             tree = ET.parse(output_path)
@@ -158,10 +162,9 @@ def generate_rss_xml(category, items, output_path):
             channel_elem = root.find("channel")
             if channel_elem is not None:
                 for item_elem in channel_elem.findall("item"):
-                    # Zachovame len spravy z inych dni ako dnes (aby sme dnesnu popripade prepisali novou)
                     guid_elem = item_elem.find("guid")
                     guid_val = guid_elem.text if guid_elem is not None else ""
-                    if not guid_val.endswith(f"-{today_iso}"):
+                    if guid_val not in today_guids:
                         existing_items.append(item_elem)
         except Exception as e:
             print(f"Poznamka: Nepodarilo sa nacitat stavajuce RSS, vytvaram nove ({e})")
@@ -169,43 +172,46 @@ def generate_rss_xml(category, items, output_path):
     rss = ET.Element("rss", version="2.0")
     channel = ET.SubElement(rss, "channel")
     
-    ET.SubElement(channel, "title").text = category["title"]
-    ET.SubElement(channel, "description").text = category["description"]
-    ET.SubElement(channel, "link").text = f"https://pato7.github.io/rss-news-aggregator/{category['id']}.xml"
+    ET.SubElement(channel, "title").text = "Denné IT & AI Novinky"
+    ET.SubElement(channel, "description").text = "Jednotný denný sumarizovaný prehľad najvýznamnejších správ z oboru IT a AI."
+    ET.SubElement(channel, "link").text = "https://pato7.github.io/rss-news-aggregator/daily-news.xml"
     ET.SubElement(channel, "language").text = "sk"
     ET.SubElement(channel, "pubDate").text = now_str
     
-    # Vytvorenie JEDNEJ dennej polozky so 10 novinkami vo formate HTML
-    if isinstance(items, list) and len(items) > 0:
-        daily_entry = ET.SubElement(channel, "item")
-        ET.SubElement(daily_entry, "title").text = f"{category['title']} – {today_display}"
-        ET.SubElement(daily_entry, "link").text = f"https://pato7.github.io/rss-news-aggregator/{category['id']}.xml#{today_iso}"
-        ET.SubElement(daily_entry, "guid").text = f"digest-{category['id']}-{today_iso}"
-        ET.SubElement(daily_entry, "pubDate").text = now_str
+    # Vytvorenie poloziek pre kazdu kategoriu za dnesok
+    new_items_count = 0
+    for cat in categories_data:
+        items = cat["curated_items"]
+        cat_id_upper = cat["id"].upper()
         
-        # Priprava HTML obsahu so sumarmi a odkazmi
-        html_parts = [f"<h2>Denný prehľad – {today_display}</h2>", "<ol style='line-height: 1.6;'>"]
-        for idx, item in enumerate(items, 1):
-            if not isinstance(item, dict):
-                continue
-            title = str(item.get("title", "Bez nazvu"))
-            link = str(item.get("link", "#"))
-            summary = str(item.get("summary", ""))
+        if isinstance(items, list) and len(items) > 0:
+            daily_entry = ET.SubElement(channel, "item")
+            ET.SubElement(daily_entry, "title").text = f"{cat_id_upper}: denné novinky za {today_display}"
+            ET.SubElement(daily_entry, "link").text = f"https://pato7.github.io/rss-news-aggregator/daily-news.xml#{cat['id']}-{today_iso}"
+            ET.SubElement(daily_entry, "guid").text = f"digest-{cat['id']}-{today_iso}"
+            ET.SubElement(daily_entry, "pubDate").text = now_str
             
-            html_parts.append(
-                f"<li style='margin-bottom: 18px;'>"
-                f"<strong><a href='{link}' target='_blank' style='font-size: 16px; color: #1a0dab;'>{title}</a></strong><br/>"
-                f"<span style='color: #333;'>{summary}</span>"
-                f"</li>"
-            )
-        html_parts.append("</ol>")
-        
-        full_html_content = "".join(html_parts)
-        ET.SubElement(daily_entry, "description").text = full_html_content
-        print(f"Vytvorena 1 denna sumarizacna polozka so {len(items)} spravami.")
+            html_parts = [f"<h2>{cat['title']} – {today_display}</h2>", "<ol style='line-height: 1.6;'>"]
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                title = str(item.get("title", "Bez nazvu"))
+                link = str(item.get("link", "#"))
+                summary = str(item.get("summary", ""))
+                
+                html_parts.append(
+                    f"<li style='margin-bottom: 18px;'>"
+                    f"<strong><a href='{link}' target='_blank' style='font-size: 16px; color: #1a0dab;'>{title}</a></strong><br/>"
+                    f"<span style='color: #333;'>{summary}</span>"
+                    f"</li>"
+                )
+            html_parts.append("</ol>")
+            
+            ET.SubElement(daily_entry, "description").text = "".join(html_parts)
+            new_items_count += 1
 
-    # Pridanie predchadzajucich dni (max 30 dni historicky)
-    for prev_item in existing_items[:30]:
+    # Pridanie predchadzajucich dni (max 60 poloziek v historii)
+    for prev_item in existing_items[:60]:
         channel.append(prev_item)
         
     xml_str = ET.tostring(rss, encoding="utf-8")
@@ -215,7 +221,7 @@ def generate_rss_xml(category, items, output_path):
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, "wb") as f:
         f.write(pretty_xml)
-    print(f"RSS feed uspesne vygenerovany: {output_path}")
+    print(f"Jednotny RSS feed uspesne vygenerovany ({new_items_count} novych poloziek): {output_path}")
 
 def main():
     api_key = os.environ.get("OPENROUTER_API_KEY")
@@ -232,14 +238,20 @@ def main():
     public_dir = "public"
     os.makedirs(public_dir, exist_ok=True)
     
+    categories_data = []
     for cat in config.get("categories", []):
         print(f"\n--- Spracovavam kategoriu: {cat['title']} ---")
         articles = fetch_category_articles(cat["sources"])
         print(f"Celkovo najdenych clankov: {len(articles)}")
         
         curated_items = summarize_with_llm(client, cat["title"], articles, config)
-        out_file = os.path.join(public_dir, f"{cat['id']}.xml")
-        generate_rss_xml(cat, curated_items, out_file)
+        cat_copy = dict(cat)
+        cat_copy["curated_items"] = curated_items
+        categories_data.append(cat_copy)
+
+    # Vygenerujeme jeden hlavny feed daily-news.xml
+    master_out_file = os.path.join(public_dir, "daily-news.xml")
+    generate_unified_rss(categories_data, master_out_file)
 
 if __name__ == "__main__":
     main()
