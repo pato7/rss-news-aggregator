@@ -186,8 +186,8 @@ def generate_unified_rss(categories_data, output_path):
     channel = ET.SubElement(rss, "channel")
     
     ET.SubElement(channel, "title").text = "Denné novinky"
-    # Presny popis podla zadaní
-    ET.SubElement(channel, "description").text = "Jednotný denný sumarizovaný prehľad najvýznamnejších správ z rôznych oborov."
+    # Zmena slovneho spojenia oborov -> oblasti
+    ET.SubElement(channel, "description").text = "Jednotný denný sumarizovaný prehľad najvýznamnejších správ z rôznych oblastí."
     ET.SubElement(channel, "link").text = "https://pato7.github.io/rss-news-aggregator/daily-news.xml"
     ET.SubElement(channel, "language").text = "sk"
     ET.SubElement(channel, "pubDate").text = now_str
