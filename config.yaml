@@ -1,0 +1,29 @@
+# Konfigurácia pre AI & IT RSS Aggregator
+
+language: "sk" # Slovenčina pre sumáre
+max_items_per_category: 10
+
+# OpenRouter nastavenia
+openrouter_model: "google/gemini-2.5-flash"
+fallback_model: "meta-llama/llama-3.3-70b-instruct"
+
+# Kategórie a ich zdroje
+categories:
+  - id: "ai"
+    title: "TOP 10 AI Novinky Dňa"
+    description: "Denný AI sumarizovaný prehľad najvýznamnejších správ z oboru umelá inteligencia."
+    sources:
+      - "https://hnrss.org/frontpage?points=100"
+      - "https://rss.arxiv.org/rss/cs.AI"
+      - "https://rss.arxiv.org/rss/cs.CL"
+      - "https://techcrunch.com/category/artificial-intelligence/feed/"
+      - "https://venturebeat.com/category/ai/feed/"
+
+  - id: "it"
+    title: "TOP 10 IT & Tech Novinky Dňa"
+    description: "Denný IT sumarizovaný prehľad najvýznamnejších správ z oblasti technológií, vývoja a bezpečnosti."
+    sources:
+      - "https://hnrss.org/frontpage?points=150"
+      - "https://techcrunch.com/feed/"
+      - "https://feeds.arstechnica.com/arstechnica/index"
+      - "https://www.theverge.com/rss/index.xml"
