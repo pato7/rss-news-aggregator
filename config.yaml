@@ -27,3 +27,12 @@ categories:
       - "https://techcrunch.com/feed/"
       - "https://feeds.arstechnica.com/arstechnica/index"
       - "https://www.theverge.com/rss/index.xml"
+
+  - id: "it-sk"
+    title: "IT novinky v SK"
+    description: "Denný IT sumarizovaný prehľad najvýznamnejších správ z oblasti IT na Slovensku."
+    sources:
+      - "https://www.zive.sk/rss/najnovsie/"
+      - "https://touchit.sk/feed"
+      - "https://www.nextech.sk/site/rssfeed/type/ITpro/page/1"
+      - "https://www.dsl.sk/export/rss_articles.php"      
