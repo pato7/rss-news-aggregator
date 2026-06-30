@@ -2,8 +2,8 @@ name: Daily RSS News
 
 on:
   schedule:
-    # Spúšťa sa každý deň o 05:00 UTC (čo zodpovedá 07:00 nášho času Europe/Bratislava v lete)
-    - cron: '0 5 * * *'
+    # Spúšťa sa každý deň o 04:00 UTC (čo zodpovedá 06:00 nášho času Europe/Bratislava v lete)
+    - cron: '0 4 * * *'
   workflow_dispatch: # Umožňuje spustiť automatizáciu aj manuálne z rozhrania GitHubu
 
 permissions:
