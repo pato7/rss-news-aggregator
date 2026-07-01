@@ -1,4 +1,4 @@
-# 📰 AI & IT Daily RSS Aggregator
+# 📰 Daily News RSS Aggregator
 
 Automatizovaný generátor jedného denného sumarizovaného RSS feedu pre AI a IT v slovenčine.
 
