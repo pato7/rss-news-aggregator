@@ -204,7 +204,7 @@ def generate_unified_rss(categories_data, output_path):
             ET.SubElement(daily_entry, "guid").text = f"digest-{cat['id']}-{today_iso}"
             ET.SubElement(daily_entry, "pubDate").text = now_str
             
-            html_parts = [f"<h2>{cat['title']} – {today_display}</h2>", "<ol style='line-height: 1.6;'>"]
+            html_parts = [f"<h2>{cat['title']} – {today_display}</h2>", "<ol>"]
             for item in items:
                 if not isinstance(item, dict):
                     continue
@@ -213,9 +213,9 @@ def generate_unified_rss(categories_data, output_path):
                 summary = str(item.get("summary", ""))
                 
                 html_parts.append(
-                    f"<li style='margin-bottom: 18px;'>"
-                    f"<strong><a href='{link}' target='_blank' style='font-size: 16px; color: #1a0dab;'>{title}</a></strong><br/>"
-                    f"<span style='color: #333;'>{summary}</span>"
+                    f"<li>"
+                    f"<strong><a href='{link}' target='_blank'>{title}</a></strong><br/>"
+                    f"<span>{summary}</span>"
                     f"</li>"
                 )
             html_parts.append("</ol>")
